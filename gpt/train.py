@@ -4,21 +4,27 @@ from torch.nn import functional as F
 import gc
 from gpt_model import BasicGPT
 from tqdm import tqdm, trange
+import math
 
-# model args
-n_embd = 192
-n_head = 4
-n_layer = 4
-block_size = 256
-dropout = 0.2
+# Improved model args - larger model
+n_embd = 384  # Increased from 192
+n_head = 6    # Increased from 4
+n_layer = 6   # Increased from 4
+block_size = 512  # Increased context length
+dropout = 0.1     # Reduced dropout
 
 # other hyperparameters
 train_perc = 0.9
-batch_size = 32
-iterations = 4000
+batch_size = 64   # Larger batch size
+iterations = 10000  # More training steps
 eval_interval = 500
-learning_rate = 3e-4
-eval_iters = 200
+learning_rate = 1e-4  # Lower learning rate
+weight_decay = 1e-1   # Add weight decay
+
+# Learning rate scheduling
+warmup_steps = 1000
+max_lr = 6e-4
+min_lr = max_lr * 0.1
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -101,8 +107,23 @@ model.to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 progress = trange(1, iterations + 1, desc='Iterations')
 
+def get_lr(it):
+    # Linear warmup for warmup_iters steps
+    if it < warmup_steps:
+        return max_lr * it / warmup_steps
+    # Cosine decay down to min learning rate
+    if it > iterations:
+        return min_lr
+    decay_ratio = (it - warmup_steps) / (iterations - warmup_steps)
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (max_lr - min_lr)
+
 final_val = 0
 for iter in progress:
+    lr = get_lr(iter)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
     if iter % eval_interval == 0 or iter == 1:
         losses = estimate_loss()
         progress.set_description(f"step {iter} | train {losses['train']:.3f} | val {losses['test']:.3f}")
@@ -117,6 +138,7 @@ for iter in progress:
     logits, loss = model(xb, yb)  # Perform a forward pass
     optimizer.zero_grad(set_to_none=True)  # Zeroes out the gradient from prev
     loss.backward()  # Computing the gradient
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimizer.step()  # Update the parameters using the optimizer
 
 """Try out the new model (obv not gonna be good)"""

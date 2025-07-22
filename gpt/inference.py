@@ -27,7 +27,27 @@ model = BasicGPT(**model_args, device=device).to(device)
 model.load_state_dict(config['model_state_dict'])
 model.eval()
 
-text_inp = input("Input text: ")
-encoded = torch.unsqueeze(torch.tensor(encode(text_inp)), 0)
-answer = decode(model.generate(encoded, max_new_tokens=1000)[0].tolist())
-print(answer)
+def generate_text(prompt, max_tokens=500, temperature=0.8, top_k=50):
+    encoded = torch.tensor(encode(prompt)).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        generated = model.generate(
+            encoded,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            top_k=top_k
+        )
+
+    return decode(generated[0].tolist())
+
+# Interactive loop
+while True:
+    prompt = input("\nEnter prompt (or 'quit' to exit): ")
+    if prompt.lower() == 'quit':
+        break
+
+    temp = float(input("Temperature (0.1-2.0, default 0.8): ") or "0.8")
+    max_tokens = int(input("Max tokens (default 200): ") or "200")
+
+    result = generate_text(prompt, max_tokens, temp)
+    print(f"\nGenerated text:\n{result}")

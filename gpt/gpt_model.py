@@ -82,6 +82,17 @@ class BasicGPT(nn.Module):
         self.device = device
         self.block_size = block_size
 
+        # Initialize weights properly
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
     def forward(self, idx, target=None):
         B, T = idx.shape
         token_emb = self.token_embed(idx)  # (Batch, Time, Channel=n_embd)
@@ -103,13 +114,19 @@ class BasicGPT(nn.Module):
 
         return logits, loss
 
-    def generate(self, idx, max_new_tokens=100):
+    def generate(self, idx, max_new_tokens=100, temperature=1.0, top_k=None):
         idx = idx.to(self.device)
         for i in range(max_new_tokens):
             idx_cond = idx[:, -self.block_size:]
-            logits, _ = self(idx_cond)  # Compute logits
-            logits = logits[:, -1, :]  # Looks at the latest logit
-            probs = F.softmax(logits, dim=-1)  # Computes the probability for next char
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :] / temperature
+
+            # Top-k sampling
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+
+            probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
             idx = torch.cat((idx, idx_next), dim=1)
         return idx
