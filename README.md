@@ -1,6 +1,6 @@
 # GPT From Scratch
 
-A hands-on exploration of how GPT (Generative Pre-trained Transformer) actually works, implemented from the ground up using PyTorch. This project demonstrates the journey from simple language models to transformer architectures.
+A hands-on exploration of how GPT (Generative Pre-trained Transformer) actually works, implemented from the ground up using PyTorch. This project aims to build an intuition on how these LLMs work from the inside. Heavy instructions from Andrej Karpathy and his video: https://www.youtube.com/watch?v=kCc8FmEb1nY&t=1s
 
 ## What's Inside
 
